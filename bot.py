@@ -21,6 +21,7 @@ from aiogram.types import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     FSInputFile,
+    InputMediaPhoto,
     PreCheckoutQuery, LabeledPrice, SuccessfulPayment
 )
 from aiogram.exceptions import TelegramBadRequest
@@ -117,12 +118,12 @@ class Database:
         self.connection.commit()
         return self.cursor.rowcount > 0
     
-    def get_public_themes(self, offset=0, limit=5):
+    def get_public_themes(self):
         self.cursor.execute('''
-            SELECT t.id, t.name, t.description, u.username 
+            SELECT t.id, t.name, t.description, u.username, t.preview_file_id
             FROM themes t JOIN users u ON t.owner_id = u.id
-            WHERE t.is_public = 1 ORDER BY t.upload_date DESC LIMIT ? OFFSET ?
-        ''', (limit, offset))
+            WHERE t.is_public = 1 ORDER BY t.upload_date DESC
+        ''')
         return self.cursor.fetchall()
 
     def count_public_themes(self):
@@ -340,9 +341,9 @@ async def upload_theme_start(callback: CallbackQuery, state: FSMContext):
 
     await state.set_state(UploadTheme.waiting_for_file)
     await callback.message.edit_text(
-        f"Отлично! Отправьте мне файл темы в формате `.fptheme`.\n\n"
-        f"⚠️ **Требования:**\n"
-        f"- Только формат `.fptheme`\n"
+        f"Отлично! Отправьте мне файл темы в формате .fptheme\n\n"
+        f"⚠️ ТРЕБОВАНИЯ:\n"
+        f"- Только формат .fptheme\n"
         f"- Размер до {config.MAX_FILE_SIZE_MB} МБ\n"
         f"- Тема не должна быть дубликатом уже загруженной\n\n"
         f"У вас осталось слотов: {user_slots - current_themes}",
@@ -531,56 +532,70 @@ async def confirm_delete_handler(callback: CallbackQuery):
     if db.delete_theme(theme_id, callback.from_user.id):
         await callback.answer("Тема удалена.", show_alert=True)
         await callback.message.delete()
-        
         await callback.message.answer("Возврат к списку тем...")
         await my_themes_handler(callback)
     else:
         await callback.answer("Ошибка при удалении.", show_alert=True)
 
+async def show_store_page(callback_or_message, page: int):
+    themes = db.get_public_themes()
+    total_themes = len(themes)
+
+    message_instance = callback_or_message if isinstance(callback_or_message, Message) else callback_or_message.message
+
+    if not themes:
+        await message_instance.edit_text("В магазине пока нет публичных тем.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 Назад", callback_data="start")]]))
+        return
+
+    page = max(0, min(page, total_themes - 1))
+    
+    theme_id, name, desc, username, preview_file_id = themes[page]
+    
+    caption = f"🎨 **{name}**\n\n📝 *{desc}*\n\n👤 Автор: @{username}"
+    
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(InlineKeyboardButton(text="◀️", callback_data=f"store_{page-1}"))
+    else:
+        nav_buttons.append(InlineKeyboardButton(text=" ", callback_data="noop"))
+
+    nav_buttons.append(InlineKeyboardButton(text="📥 Скачать", callback_data=f"download_{theme_id}"))
+    nav_buttons.append(InlineKeyboardButton(text=f"{page + 1} / {total_themes}", callback_data="noop"))
+
+    if page < total_themes - 1:
+        nav_buttons.append(InlineKeyboardButton(text="▶️", callback_data=f"store_{page+1}"))
+    else:
+        nav_buttons.append(InlineKeyboardButton(text=" ", callback_data="noop"))
+        
+    keyboard = [nav_buttons, [InlineKeyboardButton(text="🔙 В главное меню", callback_data="start")]]
+    
+    media = InputMediaPhoto(media=preview_file_id, caption=caption, parse_mode="Markdown")
+    
+    if isinstance(callback_or_message, CallbackQuery):
+        try:
+            await callback_or_message.message.edit_media(media=media, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+        except TelegramBadRequest as e:
+            if "message is not modified" in e.message:
+                await callback_or_message.answer()
+            else:
+                logging.error(f"Error editing media: {e}")
+    else:
+        await message_instance.answer_photo(photo=preview_file_id, caption=caption, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+
 @dp.callback_query(F.data.startswith("store_"))
 async def store_handler(callback: CallbackQuery):
     page = int(callback.data.split("_")[1])
-    limit = 5
-    offset = page * limit
     
-    themes = db.get_public_themes(offset, limit)
-    total_themes = db.count_public_themes()
     
-    if not themes and page == 0:
-        await callback.message.edit_text("В магазине пока нет публичных тем.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 Назад", callback_data="start")]]))
-        return
-        
-    if callback.message.photo or not (callback.message.text and "Страница" in callback.message.text):
+    if callback.message.text and "Добро пожаловать" in callback.message.text:
         await callback.message.delete()
+        await show_store_page(callback.message, page)
+    else: 
+        await show_store_page(callback, page)
 
-    for theme_id, name, desc, username in themes:
-        theme = db.get_theme_by_id(theme_id)
-        caption = f"🎨 **{name}**\n📝 *{desc}*\n👤 Автор: @{username}"
-        await bot.send_photo(
-            chat_id=callback.message.chat.id, photo=theme[8], caption=caption,
-            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="📥 Скачать", callback_data=f"download_{theme_id}")]
-            ])
-        )
-    
-    has_next = (page + 1) * limit < total_themes
-    has_prev = page > 0
-    nav_buttons = []
-    if has_prev:
-        nav_buttons.append(InlineKeyboardButton(text="◀️ Назад", callback_data=f"store_{page-1}"))
-    if has_next:
-        nav_buttons.append(InlineKeyboardButton(text="▶️ Вперед", callback_data=f"store_{page+1}"))
-        
-    keyboard = []
-    if nav_buttons: keyboard.append(nav_buttons)
-    keyboard.append([InlineKeyboardButton(text="🔙 В главное меню", callback_data="start")])
-    
-    page_text = f"Страница {page + 1} (темы {offset + 1}-{min(offset + limit, total_themes)} из {total_themes})"
-    
-    if callback.message.text and "Страница" in callback.message.text:
-         await callback.message.edit_text(page_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
-    else:
-        await callback.message.answer(page_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+@dp.callback_query(F.data == "noop")
+async def noop_handler(callback: CallbackQuery):
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("download_"))
 async def download_theme_handler(callback: CallbackQuery):
