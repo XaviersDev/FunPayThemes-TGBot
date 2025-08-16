@@ -312,8 +312,24 @@ async def admin_panel(message: Message):
 @dp.callback_query(F.data == "start")
 async def back_to_start(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text("👋 Добро пожаловать в FunPay Themes Bot!\n\nЗдесь вы можете загружать, скачивать и делиться темами для расширения FunPay Tools.",
-                                     reply_markup=main_menu_keyboard())
+    text = "👋 Добро пожаловать в FunPay Themes Bot!\n\nЗдесь вы можете загружать, скачивать и делиться темами для расширения FunPay Tools."
+    markup = main_menu_keyboard()
+
+    
+    if callback.message.photo:
+        
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=markup)
+    else:
+        
+        
+        try:
+            await callback.message.edit_text(text, reply_markup=markup)
+        except TelegramBadRequest as e:
+            if "message is not modified" in str(e):
+                await callback.answer() 
+            else:
+                raise e 
 
 @dp.callback_query(F.data == "check_subscription")
 async def check_sub_callback(callback: CallbackQuery, state: FSMContext):
@@ -710,7 +726,7 @@ async def main():
         if not os.path.exists(font_path):
             try:
                 logging.info(f"Downloading font: {font_filename}")
-                url = f"https://github.com/google/fonts/raw/main/apache/roboto/{font_filename}"
+                url = f"https://github.com/google/fonts/raw/main/ofl/roboto/{font_filename}"
                 response = requests.get(url)
                 response.raise_for_status()
                 with open(font_path, 'wb') as f:
