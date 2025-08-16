@@ -6,6 +6,7 @@ import json
 import hashlib
 import secrets
 import io
+import base64
 
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
@@ -173,6 +174,15 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
+def get_font(size, style='Regular'):
+    font_map = {'Regular': 'Roboto-Regular.ttf', 'Bold': 'Roboto-Bold.ttf'}
+    font_filename = font_map.get(style, 'Roboto-Regular.ttf')
+    font_path = os.path.join(SCRIPT_DIR, font_filename)
+    try:
+        return ImageFont.truetype(font_path, size)
+    except IOError:
+        return ImageFont.load_default(size)
+
 async def generate_preview(theme_data: dict, temp_file_path: str):
     try:
         W, H = 1280, 720
@@ -181,13 +191,11 @@ async def generate_preview(theme_data: dict, temp_file_path: str):
         bg_image_url = theme_data.get('bgImage')
         if bg_image_url:
             try:
-                if bg_image_url.startswith('data:image/gif;base64,'):
-                    import base64
-                    img_data = base64.b64decode(bg_image_url.split(',')[1])
+                bg_img_data = None
+                if bg_image_url.startswith('data:image'):
+                    header, encoded = bg_image_url.split(',', 1)
+                    img_data = base64.b64decode(encoded)
                     bg_img_data = io.BytesIO(img_data)
-                elif bg_image_url.startswith('data:image'):
-                    
-                    pass
                 else:
                     response = requests.get(bg_image_url, timeout=10)
                     response.raise_for_status()
@@ -215,12 +223,8 @@ async def generate_preview(theme_data: dict, temp_file_path: str):
                 logging.warning(f"Could not load background image: {e}")
 
         draw = ImageDraw.Draw(img, 'RGBA')
-
-        bar_h = 80
-        bar_y = H - bar_h - 40
-        bar_x = 40
-        bar_w = W - 80
         
+        bar_h = 80; bar_y = H - bar_h - 40; bar_x = 40; bar_w = W - 80
         container_color = list(hex_to_rgb(theme_data.get('containerBgColor', '#1e1e1e')))
         container_color.append(int(float(theme_data.get('containerBgOpacity', 0.85)) * 255))
         
@@ -230,22 +234,18 @@ async def generate_preview(theme_data: dict, temp_file_path: str):
             fill=tuple(container_color)
         )
         
-        colors = {
-            "Основной": theme_data.get('bgColor1', '#000000'),
-            "Акцент": theme_data.get('bgColor2', '#000000'),
-            "Фон блоков": theme_data.get('containerBgColor', '#1e1e1e'),
-            "Текст": theme_data.get('textColor', '#ffffff'),
-            "Ссылки": theme_data.get('linkColor', '#0099ff'),
-        }
+        colors = [
+            theme_data.get('bgColor1', '#000000'), theme_data.get('bgColor2', '#000000'),
+            theme_data.get('containerBgColor', '#1e1e1e'), theme_data.get('textColor', '#ffffff'),
+            theme_data.get('linkColor', '#0099ff'),
+        ]
         
         color_w = (bar_w - 40) / len(colors)
         current_x = bar_x + 20
-        for color_hex in colors.values():
+        for color_hex in colors:
             draw.rectangle(
                 (current_x, bar_y + 20, current_x + color_w - 20, bar_y + bar_h - 20),
-                fill=color_hex,
-                outline="#fff",
-                width=1
+                fill=color_hex, outline="#fff", width=1
             )
             current_x += color_w
             
@@ -254,6 +254,15 @@ async def generate_preview(theme_data: dict, temp_file_path: str):
     except Exception as e:
         logging.error(f"Fatal error in Pillow preview generation: {e}", exc_info=True)
         return None
+
+def get_theme_features_text(theme_data):
+    features = []
+    if theme_data.get('bgImage'): features.append("🖼️ Фон")
+    if theme_data.get('enableCircleCustomization'): features.append("💿 Круги")
+    if theme_data.get('enableImprovedSeparators'): features.append("✨ Разделители")
+    if theme_data.get('enableGlassmorphism'): features.append("💎 Стекло")
+    if theme_data.get('enableCustomScrollbar'): features.append("📜 Скроллбар")
+    return " | ".join(features) if features else "Стандартный набор"
 
 def main_menu_keyboard():
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -453,7 +462,6 @@ async def my_themes_handler(callback: CallbackQuery):
         keyboard.append([InlineKeyboardButton(text=f"{status} {name}", callback_data=f"manage_theme_{theme_id}")])
     keyboard.append([InlineKeyboardButton(text="🔙 Назад", callback_data="start")])
     
-    
     if callback.message.photo:
         await callback.message.delete()
         await callback.message.answer("Ваши темы:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
@@ -469,10 +477,17 @@ async def manage_theme_handler(callback: CallbackQuery):
         await callback.answer("Тема не найдена или у вас нет прав.", show_alert=True)
         return
         
-    _, unique_id, _, name, desc, is_public, file_id, _, preview_file_id, _ = theme
+    _, unique_id, _, name, desc, is_public, file_id, file_hash, preview_file_id, _ = theme
     status_text = "Публичная" if is_public else "Приватная"
+
+    temp_path = os.path.join(THEMES_DIR, f"temp_{callback.from_user.id}_{file_hash}.fptheme")
+    await bot.download(file_id, destination=temp_path)
+    with open(temp_path, 'r', encoding='utf-8') as f:
+        theme_data = json.load(f)
+    os.remove(temp_path)
+    features = get_theme_features_text(theme_data)
     
-    caption = f"🎨 **{name}**\n\n📝 *{desc}*\n\nСтатус: **{status_text}**"
+    caption = f"🎨 **{name}**\n\n📝 *{desc}*\n\n⚙️ Включено: `{features}`\n\nСтатус: **{status_text}**"
     
     privacy_btn_text = "🔒 Сделать приватной" if is_public else "🌍 Сделать публичной"
     privacy_callback = f"privacy_theme_{theme_id}_{0 if is_public else 1}"
@@ -516,6 +531,8 @@ async def confirm_delete_handler(callback: CallbackQuery):
     if db.delete_theme(theme_id, callback.from_user.id):
         await callback.answer("Тема удалена.", show_alert=True)
         await callback.message.delete()
+        
+        await callback.message.answer("Возврат к списку тем...")
         await my_themes_handler(callback)
     else:
         await callback.answer("Ошибка при удалении.", show_alert=True)
@@ -533,6 +550,9 @@ async def store_handler(callback: CallbackQuery):
         await callback.message.edit_text("В магазине пока нет публичных тем.", reply_markup=InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="🔙 Назад", callback_data="start")]]))
         return
         
+    if callback.message.photo or not (callback.message.text and "Страница" in callback.message.text):
+        await callback.message.delete()
+
     for theme_id, name, desc, username in themes:
         theme = db.get_theme_by_id(theme_id)
         caption = f"🎨 **{name}**\n📝 *{desc}*\n👤 Автор: @{username}"
@@ -555,10 +575,12 @@ async def store_handler(callback: CallbackQuery):
     if nav_buttons: keyboard.append(nav_buttons)
     keyboard.append([InlineKeyboardButton(text="🔙 В главное меню", callback_data="start")])
     
-    if callback.message.photo:
-        await callback.message.answer(f"Страница {page + 1}", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+    page_text = f"Страница {page + 1} (темы {offset + 1}-{min(offset + limit, total_themes)} из {total_themes})"
+    
+    if callback.message.text and "Страница" in callback.message.text:
+         await callback.message.edit_text(page_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
     else:
-        await callback.message.edit_text(f"Страница {page + 1}", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+        await callback.message.answer(page_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
 @dp.callback_query(F.data.startswith("download_"))
 async def download_theme_handler(callback: CallbackQuery):
