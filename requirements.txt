@@ -1,0 +1,3 @@
+# requirements.txt
+aiogram==3.7.0
+playwright==1.44.0
