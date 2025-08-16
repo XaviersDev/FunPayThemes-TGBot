@@ -1,7 +1,7 @@
 
 import asyncio
 import logging
-import os  
+import os
 import sqlite3
 import json
 import hashlib
@@ -36,13 +36,13 @@ dp = Dispatcher()
 
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-
+THEMES_DIR = os.path.join(SCRIPT_DIR, config.THEMES_FOLDER_NAME)
+DB_PATH = os.path.join(SCRIPT_DIR, config.DB_NAME)
+PREVIEW_TEMPLATE_PATH = os.path.join(SCRIPT_DIR, 'preview_template.html')
 
 
 class Database:
-    def __init__(self, db_file):
-        
-        db_path = os.path.join(SCRIPT_DIR, db_file)
+    def __init__(self, db_path):
         self.connection = sqlite3.connect(db_path)
         self.cursor = self.connection.cursor()
         self.setup()
@@ -74,7 +74,8 @@ class Database:
             )
         ''')
         self.connection.commit()
-
+    
+    
     def add_user(self, user_id, username):
         self.cursor.execute("INSERT OR IGNORE INTO users (id, username) VALUES (?, ?)", (user_id, username))
         self.connection.commit()
@@ -156,7 +157,7 @@ class Database:
         self.connection.commit()
 
 
-db = Database(config.DB_NAME)
+db = Database(DB_PATH)
 
 
 class UploadTheme(StatesGroup):
@@ -197,9 +198,7 @@ dp.callback_query.middleware(AccessMiddleware())
 
 async def generate_preview(theme_data: dict, temp_file_path: str):
     try:
-        
-        template_path = os.path.join(SCRIPT_DIR, 'preview_template.html')
-        with open(template_path, 'r', encoding='utf-8') as f:
+        with open(PREVIEW_TEMPLATE_PATH, 'r', encoding='utf-8') as f:
             template = f.read()
 
         
@@ -228,7 +227,6 @@ async def generate_preview(theme_data: dict, temp_file_path: str):
     except Exception as e:
         logging.error(f"Error generating preview: {e}")
         return None
-
 
 
 
@@ -331,7 +329,7 @@ async def process_theme_file(message: Message, state: FSMContext):
         await message.reply(f"Файл слишком большой. Максимальный размер - {config.MAX_FILE_SIZE_MB} МБ.")
         return
     
-    temp_path = os.path.join(config.THEMES_DIR, f"temp_{message.from_user.id}_{document.file_unique_id}.FunPaytheme")
+    temp_path = os.path.join(THEMES_DIR, f"temp_{message.from_user.id}_{document.file_unique_id}.FunPaytheme")
     await bot.download(document, destination=temp_path)
 
     try:
@@ -386,7 +384,7 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
     user_data = await state.get_data()
     theme_data = user_data['theme_data']
     
-    preview_path = os.path.join(config.THEMES_DIR, f"preview_{callback.from_user.id}_{secrets.token_hex(8)}.jpg")
+    preview_path = os.path.join(THEMES_DIR, f"preview_{callback.from_user.id}_{secrets.token_hex(8)}.jpg")
     
     generated_path = await generate_preview(theme_data, preview_path)
     
@@ -412,7 +410,6 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
         final_caption = f"✅ Тема **{user_data['name']}** успешно загружена!\n\nВы можете управлять ей во вкладке 'Мои темы'."
 
         if not is_public:
-            
             last_theme = db.get_user_themes(callback.from_user.id)[0]
             theme_info = db.get_theme_by_id(last_theme[0])
             if theme_info:
@@ -429,6 +426,7 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
             os.remove(generated_path)
         await state.clear()
         await callback.message.answer("Возвращаю в главное меню...", reply_markup=main_menu_keyboard())
+
 
 @dp.callback_query(F.data == "my_themes")
 async def my_themes_handler(callback: CallbackQuery):
@@ -508,6 +506,7 @@ async def confirm_delete_handler(callback: CallbackQuery):
     else:
         await callback.answer("Ошибка при удалении.", show_alert=True)
         
+
 @dp.callback_query(F.data.startswith("store_"))
 async def store_handler(callback: CallbackQuery):
     page = int(callback.data.split("_")[1])
@@ -533,6 +532,7 @@ async def store_handler(callback: CallbackQuery):
                 [InlineKeyboardButton(text="📥 Скачать", callback_data=f"download_{theme_id}")]
             ])
         )
+    
     
     has_next = (page + 1) * limit < total_themes
     has_prev = page > 0
@@ -561,6 +561,7 @@ async def download_theme_handler(callback: CallbackQuery):
         await bot.send_document(chat_id=callback.from_user.id, document=theme[6]) 
     else:
         await callback.answer("Тема не найдена.", show_alert=True)
+
 
 @dp.callback_query(F.data == "buy_slots")
 async def buy_slots_handler(callback: CallbackQuery):
@@ -595,9 +596,8 @@ async def successful_payment_handler(message: Message):
 
 
 async def main():
-    themes_path = os.path.join(SCRIPT_DIR, config.THEMES_DIR)
-    if not os.path.exists(themes_path):
-        os.makedirs(themes_path)
+    if not os.path.exists(THEMES_DIR):
+        os.makedirs(THEMES_DIR)
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
