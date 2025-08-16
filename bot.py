@@ -309,9 +309,9 @@ async def upload_theme_start(callback: CallbackQuery, state: FSMContext):
 
     await state.set_state(UploadTheme.waiting_for_file)
     await callback.message.edit_text(
-        f"Отлично! Отправьте мне файл темы в формате `.FunPaytheme`.\n\n"
+        f"Отлично! Отправьте мне файл темы в формате `.fptheme`.\n\n"
         f"⚠️ **Требования:**\n"
-        f"- Только формат `.FunPaytheme`\n"
+        f"- Только формат `.fptheme`\n"
         f"- Размер до {config.MAX_FILE_SIZE_MB} МБ\n"
         f"- Тема не должна быть дубликатом уже загруженной\n\n"
         f"У вас осталось слотов: {user_slots - current_themes}",
@@ -321,15 +321,15 @@ async def upload_theme_start(callback: CallbackQuery, state: FSMContext):
 @dp.message(UploadTheme.waiting_for_file, F.document)
 async def process_theme_file(message: Message, state: FSMContext):
     document = message.document
-    if not document.file_name.endswith('.FunPaytheme'):
-        await message.reply("Неверный формат файла. Пожалуйста, отправьте файл с расширением `.FunPaytheme`.")
+    if not document.file_name.endswith('.fptheme'):
+        await message.reply("Неверный формат файла. Пожалуйста, отправьте файл с расширением `.fptheme`.")
         return
 
     if document.file_size > config.MAX_FILE_SIZE_MB * 1024 * 1024:
         await message.reply(f"Файл слишком большой. Максимальный размер - {config.MAX_FILE_SIZE_MB} МБ.")
         return
     
-    temp_path = os.path.join(THEMES_DIR, f"temp_{message.from_user.id}_{document.file_unique_id}.FunPaytheme")
+    temp_path = os.path.join(THEMES_DIR, f"temp_{message.from_user.id}_{document.file_unique_id}.fptheme")
     await bot.download(document, destination=temp_path)
 
     try:
