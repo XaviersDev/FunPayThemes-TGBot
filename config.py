@@ -1,14 +1,16 @@
-# config.py
-import os
 
-API_TOKEN = 'YOUR_BOT_TOKEN_HERE' 
+
+API_TOKEN = 'YOUR_BOT_TOKEN_HERE'  
 
 ADMIN_ID = 0
-CHANNEL_ID = '@FPTools' 
+CHANNEL_ID = '@FPTools'  
+
 
 DB_NAME = 'themes_bot.db'
-THEMES_DIR = os.path.join(_basedir, 'fpthemes')
+THEMES_FOLDER_NAME = 'fpthemes'  
+
+
 MAX_FILE_SIZE_MB = 3
 FREE_THEME_SLOTS = 10
 PAID_THEME_SLOTS = 10
-STARS_PRICE = 80 # цена в старсах за дополнительные слоты на темы
+STARS_PRICE = 100 
