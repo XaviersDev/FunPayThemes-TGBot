@@ -1,4 +1,4 @@
-# bot.py
+
 import asyncio
 import logging
 import os
@@ -215,11 +215,11 @@ async def generate_preview(theme_data: dict, temp_file_path: str, owner_name: st
                     bottom = (new_h + H) / 2
                     bg = bg.crop((left, top, right, bottom))
                     
-                    blur_radius = theme_data.get('bgBlur', 0)
+                    blur_radius = int(theme_data.get('bgBlur', 0))
                     if blur_radius > 0:
                         bg = bg.filter(ImageFilter.GaussianBlur(radius=blur_radius))
                     
-                    brightness = theme_data.get('bgBrightness', 100) / 100
+                    brightness = float(theme_data.get('bgBrightness', 100)) / 100
                     enhancer = ImageEnhance.Brightness(bg)
                     bg = enhancer.enhance(brightness)
                     
@@ -232,10 +232,14 @@ async def generate_preview(theme_data: dict, temp_file_path: str, owner_name: st
         card_w, card_h = 800, 450
         card_x, card_y = (W - card_w) // 2, (H - card_h) // 2
         container_color = list(hex_to_rgb(theme_data.get('containerBgColor', '#1e1e1e')))
-        container_color.append(int(theme_data.get('containerBgOpacity', 0.85) * 255))
+        container_color.append(int(float(theme_data.get('containerBgOpacity', 0.85)) * 255))
+        
+        
+        border_radius = int(theme_data.get('borderRadius', 12))
+        
         draw.rounded_rectangle(
             (card_x, card_y, card_x + card_w, card_y + card_h),
-            radius=theme_data.get('borderRadius', 12),
+            radius=border_radius,
             fill=tuple(container_color)
         )
 
@@ -426,14 +430,14 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text("⏳ Генерирую превью... Это может занять несколько секунд.")
     
     user_data = await state.get_data()
-    theme_data = user_data['theme_data']
-    theme_data['name'] = user_data['name']
-    theme_data['description'] = user_data['description']
+    theme_data_from_file = user_data['theme_data']
+    theme_data_from_file['name'] = user_data['name']
+    theme_data_from_file['description'] = user_data['description']
 
     preview_path = os.path.join(THEMES_DIR, f"preview_{callback.from_user.id}_{secrets.token_hex(8)}.jpg")
     
     owner_name = callback.from_user.username or callback.from_user.id
-    generated_path = await generate_preview(theme_data, preview_path, str(owner_name))
+    generated_path = await generate_preview(theme_data_from_file, preview_path, str(owner_name))
     
     if not generated_path:
         await callback.message.edit_text("❌ Произошла ошибка при создании превью. Попробуйте загрузить тему еще раз.", reply_markup=main_menu_keyboard())
@@ -634,7 +638,7 @@ async def admin_actions(callback: CallbackQuery, state: FSMContext):
     if action == "broadcast":
         await state.set_state(AdminStates.broadcast_message)
         await callback.message.edit_text("Введите сообщение для рассылки всем пользователям:")
-    elif action == "delete":
+    elif action == "deletetheme":
         await state.set_state(AdminStates.delete_theme_id)
         await callback.message.edit_text("Введите ID темы для удаления:")
     elif action == "ban":
@@ -700,11 +704,13 @@ async def main():
         if not os.path.exists(font_path):
             try:
                 logging.info(f"Downloading font: {font_filename}")
-                url = f"https://github.com/google/fonts/raw/main/ofl/roboto/{font_filename}"
+                
+                url = f"https://github.com/google/fonts/raw/main/apache/roboto/{font_filename}"
                 response = requests.get(url)
                 response.raise_for_status()
                 with open(font_path, 'wb') as f:
                     f.write(response.content)
+                logging.info(f"Font {font_filename} downloaded successfully.")
             except Exception as e:
                 logging.error(f"Could not download font {font_filename}: {e}")
 
