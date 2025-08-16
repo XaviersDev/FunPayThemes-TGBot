@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme Preview</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        
+        :root {
+            --bg-color1: #f0f0f0;
+            --bg-color2: #e0e0e0;
+            --container-bg-color: rgba(255, 255, 255, 0.8);
+            --text-color: #333;
+            --link-color: #007bff;
+            --font-family: 'Roboto', sans-serif;
+            --border-radius: 8px;
+            --bg-blur: 0px;
+            --bg-brightness: 100%;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+            color: var(--text-color);
+            background-color: #111;
+            width: 1280px;
+            height: 720px;
+            overflow: auto; /* Changed to auto to allow scrolling if needed */
+            position: relative;
+        }
+
+        .background-image {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url("/*BG_IMAGE*/");
+            background-size: cover;
+            background-position: center;
+            filter: blur(var(--bg-blur)) brightness(var(--bg-brightness));
+            z-index: -1;
+        }
+
+        #capture-area {
+            width: 1280px;
+            min-height: 720px; /* Use min-height to adapt */
+            display: flex;
+            flex-direction: column;
+            background: linear-gradient(rgba(0,0,0,0.2), rgba(0,0,0,0.4));
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            background: var(--container-bg-color);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            flex-shrink: 0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .header-left, .header-right { 
+            display: flex; 
+            align-items: center; 
+            gap: 24px; 
+        }
+        
+        .logo { 
+            font-weight: 700; 
+            font-size: 22px; 
+            color: var(--text-color);
+            letter-spacing: 1px;
+        }
+        
+        .nav-item { 
+            font-size: 14px; 
+            color: var(--text-color);
+            opacity: 0.8;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+        
+        .nav-item:hover {
+            opacity: 1;
+        }
+        
+        .search-box {
+            display: flex;
+            align-items: center;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            padding: 6px 16px;
+            margin: 0 20px;
+        }
+        
+        .search-input {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 14px;
+            width: 200px;
+            outline: none;
+        }
+        
+        .search-input::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
+        
+        .fp-tools-btn { 
+            color: var(--link-color); 
+            font-weight: 600;
+            background: rgba(255,255,255,0.1);
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .main-content {
+            padding: 32px 40px;
+            flex-grow: 1;
+        }
+
+        .category-header { 
+            margin-bottom: 24px; 
+        }
+        
+        .category-title-line { 
+            display: flex; 
+            align-items: center; 
+            gap: 16px; 
+            margin-bottom: 12px; 
+        }
+        
+        .app-icons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .app-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        .telegram-icon {
+            background: linear-gradient(135deg, #0088cc, #229ED9);
+        }
+        
+        .hamster-icon {
+            background: linear-gradient(135deg, #FFA500, #FF8C00);
+        }
+        
+        .blum-icon {
+            background: linear-gradient(135deg, #4169E1, #6495ED);
+        }
+        
+        .catizen-icon {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+        }
+        
+        .category-title { 
+            font-size: 32px; 
+            font-weight: 700; 
+            margin: 0;
+            background: linear-gradient(135deg, var(--text-color), var(--link-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .category-description { 
+            font-size: 14px; 
+            opacity: 0.8; 
+            max-width: 640px; 
+            line-height: 1.5;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 24px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.05);
+            border-radius: var(--border-radius);
+            min-width: 80px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+        }
+        
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--link-color);
+        }
+        
+        .subcategories { 
+            display: flex; 
+            gap: 12px; 
+            margin: 24px 0;
+            flex-wrap: wrap;
+        }
+        
+        .subcategory { 
+            padding: 10px 18px; 
+            background: var(--container-bg-color); 
+            border-radius: var(--border-radius); 
+            font-size: 14px; 
+            opacity: 0.7;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .subcategory:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        
+        .subcategory.active { 
+            background: var(--bg-color1); 
+            color: var(--text-color); 
+            opacity: 1; 
+            font-weight: 500;
+            border-color: var(--link-color);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .filters { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .filter-group { 
+            display: flex; 
+            gap: 8px; 
+        }
+        
+        .filter-btn { 
+            padding: 10px 16px; 
+            background: var(--container-bg-color); 
+            border-radius: var(--border-radius); 
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .filter-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .filter-btn.active { 
+            background: var(--bg-color1);
+            border-color: var(--link-color);
+        }
+        
+        .controls-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .search-offers {
+            display: flex;
+            align-items: center;
+            background: var(--container-bg-color);
+            border-radius: var(--border-radius);
+            padding: 8px 12px;
+            gap: 8px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .search-offers input {
+            background: none;
+            border: none;
+            color: var(--text-color);
+            font-size: 13px;
+            width: 160px;
+            outline: none;
+        }
+        
+        .search-offers input::placeholder {
+            color: rgba(255,255,255,0.5);
+        }
+        
+        .toggle-switch { 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+            padding: 10px 16px; 
+            background: var(--container-bg-color); 
+            border-radius: var(--border-radius); 
+            font-size: 13px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .switch { 
+            width: 36px; 
+            height: 20px; 
+            background: #555; 
+            border-radius: 10px; 
+            position: relative;
+            transition: background 0.2s;
+        }
+        
+        .switch.active {
+            background: var(--link-color);
+        }
+        
+        .switch::after { 
+            content: ''; 
+            position: absolute; 
+            top: 2px; 
+            left: 2px; 
+            width: 16px; 
+            height: 16px; 
+            background: white; 
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        
+        .switch.active::after {
+            transform: translateX(16px);
+        }
+        
+        .sell-accounts-btn {
+            background: linear-gradient(135deg, var(--link-color), var(--bg-color2));
+            color: white;
+            padding: 10px 20px;
+            border-radius: var(--border-radius);
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            transition: transform 0.2s;
+        }
+        
+        .sell-accounts-btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        .offers-table-wrapper {
+            background: var(--container-bg-color);
+            border-radius: var(--border-radius);
+            padding: 0;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+            margin-bottom: 40px; /* Added margin for better scrolling view */
+        }
+
+        .offers-table-header { 
+            display: grid; 
+            grid-template-columns: 3fr 1fr 1fr 1fr; 
+            padding: 16px 20px; 
+            font-size: 12px; 
+            opacity: 0.7; 
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .offer-row { 
+            display: grid; 
+            grid-template-columns: 3fr 1fr 1fr 1fr; 
+            align-items: center; 
+            padding: 16px 20px; 
+            font-size: 14px; 
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        
+        .offer-row:hover {
+            background: rgba(255,255,255,0.03);
+        }
+        
+        .offer-row:last-child { 
+            border-bottom: none; 
+        }
+        
+        .offer-desc { 
+            display: flex; 
+            align-items: center; 
+            gap: 12px;
+        }
+        
+        .offer-badges {
+            display: flex;
+            gap: 4px;
+            margin-right: 8px;
+        }
+        
+        .badge {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+        
+        .badge-red { background: #ff4444; }
+        .badge-blue { background: #4444ff; }
+        .badge-green { background: #44ff44; }
+        .badge-orange { background: #ff8844; }
+        .badge-purple { background: #8844ff; }
+        
+        .offer-text {
+            font-weight: 500;
+        }
+        
+        .offer-flags {
+            margin-left: 8px;
+            opacity: 0.8;
+        }
+        
+        .seller-info { 
+            display: flex; 
+            align-items: center; 
+            gap: 8px;
+            justify-content: flex-end;
+        }
+        
+        .seller-avatar { 
+            width: 28px; 
+            height: 28px; 
+            border-radius: 50%; 
+            background: linear-gradient(135deg, #555, #777);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        .seller-name {
+            font-weight: 500;
+        }
+        
+        .seller-rating {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            opacity: 0.7;
+            margin-top: 2px;
+        }
+        
+        .stars {
+            color: #FFD700;
+        }
+        
+        .availability { 
+            text-align: right;
+            font-weight: 500;
+        }
+        
+        .price { 
+            font-weight: 700; 
+            text-align: right; 
+            color: var(--bg-color2);
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="background-image"></div>
+    <div id="capture-area">
+        <div class="header">
+            <div class="header-left">
+                <div class="logo">FUNPAY</div>
+                <div class="search-box">
+                    <input type="text" class="search-input" placeholder="Поиск по 740 играм">
+                    <span style="opacity: 0.5;">🔍</span>
+                </div>
+                <div class="nav-item">Помощь ▼</div>
+                <div class="nav-item">Лутбокс</div>
+                <div class="nav-item">Игры ▼</div>
+            </div>
+            <div class="header-right">
+                <div class="nav-item">Покупки</div>
+                <div class="nav-item">Продажи 1</div>
+                <div class="nav-item">Сообщения</div>
+                <div class="nav-item">Финансы</div>
+                <div class="nav-item">🌍 ▼</div>
+                <div class="fp-tools-btn">FP Tools</div>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="category-header">
+                <div class="app-icons">
+                    <div class="app-icon telegram-icon">📱</div>
+                    <div class="app-icon hamster-icon">🐹</div>
+                    <div class="app-icon blum-icon">💎</div>
+                    <div class="app-icon catizen-icon">🐱</div>
+                </div>
+                <div class="category-title-line">
+                    <h1 class="category-title">Аккаунты Telegram</h1>
+                </div>
+                <p class="category-description">Добро пожаловать на первую в рунете биржу игровых ценностей FunPay. Пришло время покупать напрямую у других игроков без лишних посредников и переплат! На нашем сайте продавцы получают оплату только после выполнения заказов (подробнее в разделе «Помощь»). Stay tuned!</p>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-label">Каналы</div>
+                        <div class="stat-value">5852</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Аккаунты</div>
+                        <div class="stat-value">19589</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Звёзды</div>
+                        <div class="stat-value">7908</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Подарки</div>
+                        <div class="stat-value">13187</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Услуги</div>
+                        <div class="stat-value">16755</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Premium</div>
+                        <div class="stat-value">3014</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Игры</div>
+                        <div class="stat-value">1362</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Прочее</div>
+                        <div class="stat-value">15967</div>
+                    </div>
+                </div>
+            </div>
+            <div class="subcategories">
+                <div class="subcategory">Каналы 5852</div>
+                <div class="subcategory active">Аккаунты 19589</div>
+                <div class="subcategory">Звёзды 7908</div>
+                <div class="subcategory">Подарки 13187</div>
+                <div class="subcategory">Услуги 16755</div>
+                <div class="subcategory">Premium 3014</div>
+                <div class="subcategory">Игры 1362</div>
+                <div class="subcategory">Прочее 15967</div>
+            </div>
+            <div class="filters">
+                <div class="filter-group">
+                    <div class="filter-btn active">Все</div>
+                    <div class="filter-btn">С подпиской</div>
+                    <div class="filter-btn">Без подписки</div>
+                    <div class="filter-btn">Регион ▼</div>
+                </div>
+                <div class="controls-right">
+                    <div class="search-offers">
+                        <input type="text" placeholder="Поиск по описанию">
+                        <span style="opacity: 0.5;">🔍</span>
+                    </div>
+                    <div class="toggle-switch">
+                        <span>Только продавцы онлайн</span>
+                        <div class="switch active"></div>
+                    </div>
+                    <button class="sell-accounts-btn">Продать аккаунты</button>
+                </div>
+            </div>
+            <div class="offers-table-wrapper">
+                <div class="offers-table-header">
+                    <div>Описание</div>
+                    <div style="text-align: right;">Продавец ▲</div>
+                    <div style="text-align: right;">Наличие ▲</div>
+                    <div style="text-align: right;">Цена ▲</div>
+                </div>
+                <div class="offer-row">
+                    <div class="offer-desc">
+                        <div class="offer-badges">
+                            <span class="badge badge-red"></span>
+                            <span class="badge badge-blue"></span>
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-orange"></span>
+                            <span class="badge badge-purple"></span>
+                        </div>
+                        <span class="offer-text">【TG ACCOUNT】🔥【АВТО-ВЫДАЧА】🔥🔸 БЕЗ СПАМБЛОКА 🔸🔹⚡212 - МАРОККО ⚡🔹🔸 ТОЛЬКО ВАШ 🔸 ⚡ Без подписок, Другой регион</span>
+                    </div>
+                    <div class="seller-info">
+                        <div>
+                            <div class="seller-name">Mammadovnik2</div>
+                            <div class="seller-rating">
+                                <span class="stars">★★★★★</span>
+                                <span>5350</span>
+                                <span>на сайте 2 года</span>
+                            </div>
+                        </div>
+                        <div class="seller-avatar">M</div>
+                    </div>
+                    <div class="availability">999 962</div>
+                    <div class="price">195.52 ₽</div>
+                </div>
+                <div class="offer-row">
+                    <div class="offer-desc">
+                        <span class="offer-text">☀️🌟АККАУНТ TELEGRAM ИНДИЯ +91🌟☀️ ТОЛЬКО ВАШ ☀️🌟 ЧИТАТЬ ОПИСАНИЕ🌟☀️ , Без подписок, Азия</span>
+                    </div>
+                    <div class="seller-info">
+                        <div>
+                            <div class="seller-name">Azz091</div>
+                            <div class="seller-rating">
+                                <span>на сайте 7 месяцев</span>
+                            </div>
+                        </div>
+                        <div class="seller-avatar">A</div>
+                    </div>
+                    <div class="availability">100</div>
+                    <div class="price">28.11 ₽</div>
+                </div>
+                <div class="offer-row">
+                    <div class="offer-desc">
+                        <span class="offer-text">☀️🌟АККАУНТ TELEGRAM ИНДИЯ +91🌟☀️ ТОЛЬКО ВАШ ☀️🌟 ЧИТАТЬ ОПИСАНИЕ🌟☀️ , Без подписок, Другой регион</span>
+                    </div>
+                    <div class="seller-info">
+                        <div>
+                            <div class="seller-name">Azz091</div>
+                            <div class="seller-rating">
+                                <span>на сайте 7 месяцев</span>
+                            </div>
+                        </div>
+                        <div class="seller-avatar">A</div>
+                    </div>
+                    <div class="availability">100</div>
+                    <div class="price">29.33 ₽</div>
+                </div>
+                <div class="offer-row">
+                    <div class="offer-desc">
+                        <div class="offer-badges">
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                        </div>
+                        <span class="offer-text">【+91 ИНДИЯ】☀️【АВТОВЫДАЧА】☀️【ФИЗИЧЕСКИЙ АККАУНТ】☀️【ВАШ БЕЗ СПАМБЛОКА】Без подписок, Азия</span>
+                    </div>
+                    <div class="seller-info">
+                        <div>
+                            <div class="seller-name">Bobstop</div>
+                            <div class="seller-rating">
+                                <span class="stars">★★★★★</span>
+                                <span>100</span>
+                                <span>на сайте 2 года</span>
+                            </div>
+                        </div>
+                        <div class="seller-avatar">B</div>
+                    </div>
+                    <div class="availability">9998</div>
+                    <div class="price">61.10 ₽</div>
+                </div>
+                <div class="offer-row">
+                    <div class="offer-desc">
+                        <div class="offer-badges">
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-blue"></span>
+                            <span class="badge badge-blue"></span>
+                            <span class="badge badge-blue"></span>
+                        </div>
+                        <span class="offer-text">【+44 ВЕЛИКОБРИТАНИЯ】🔥☀️🔥☀️【БЕЗ СПАМ БЛОКА】☀️🔥☀️🔥【ФИЗИЧЕСКИЙ】☀️Без подписок, Европа</span>
+                    </div>
+                    <div class="seller-info">
+                        <div>
+                            <div class="seller-name">Bobstop</div>
+                            <div class="seller-rating">
+                                <span class="stars">★★★★★</span>
+                                <span>100</span>
+                                <span>на сайте 2 года</span>
+                            </div>
+                        </div>
+                        <div class="seller-avatar">B</div>
+                    </div>
+                    <div class="availability">9976</div>
+                    <div class="price">317.72 ₽</div>
+                </div>
+                <div class="offer-row">
+                    <div class="offer-desc">
+                        <div class="offer-badges">
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                        </div>
+                        <span class="offer-text">【+54 АРГЕНТИНА】☀️【АВТОВЫДАЧА】☀️【ФИЗИЧЕСКИЙ АККАУНТ】☀️【ВАШ БЕЗ СПАМБЛОКА】🔥☀️🔥☀️Без подписок, Америка</span>
+                    </div>
+                    <div class="seller-info">
+                        <div>
+                            <div class="seller-name">Bobstop</div>
+                            <div class="seller-rating">
+                                <span class="stars">★★★★★</span>
+                                <span>100</span>
+                                <span>на сайте 2 года</span>
+                            </div>
+                        </div>
+                        <div class="seller-avatar">B</div>
+                    </div>
+                    <div class="availability">10 000</div>
+                    <div class="price">219.96 ₽</div>
+                </div>
+                <div class="offer-row">
+                    <div class="offer-desc">
+                        <div class="offer-badges">
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                            <span class="badge badge-green"></span>
+                        </div>
+                        <span class="offer-text">【+57 КОЛУМБИЯ】☀️【АВТОВЫДАЧА】☀️【ФИЗИЧЕСКИЙ АККАУНТ】☀️【ТОЛЬКО ВАШ/БЕЗ СПАМБЛОКА】Без подписок, Америка</span>
+                    </div>
+                    <div class="seller-info">
+                        <div>
+                            <div class="seller-name">Bobstop</div>
+                            <div class="seller-rating">
+                                <span class="stars">★★★★★</span>
+                                <span>100</span>
+                                <span>на сайте 2 года</span>
+                            </div>
+                        </div>
+                        <div class="seller-avatar">B</div>
+                    </div>
+                    <div class="availability">9999</div>
+                    <div class="price">73.32 ₽</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+
+        
+
+        
+        function hexToRgba(hex, opacity) {
+            if (!hex) return `rgba(0,0,0,${opacity})`;
+            let r = 0, g = 0, b = 0;
+            if (hex.length === 4) { 
+                r = "0x" + hex[1] + hex[1];
+                g = "0x" + hex[2] + hex[2];
+                b = "0x" + hex[3] + hex[3];
+            } else if (hex.length === 7) { 
+                r = "0x" + hex[1] + hex[2];
+                g = "0x" + hex[3] + hex[4];
+                b = "0x" + hex[5] + hex[6];
+            }
+            return `rgba(${+r}, ${+g}, ${+b}, ${opacity})`;
+        }
+
+        
+        function applyTheme(theme) {
+            const root = document.documentElement;
+            const bgImageElement = document.querySelector('.background-image');
+
+            
+            root.style.setProperty('--bg-color1', theme.bgColor1 || '#ffffff');
+            root.style.setProperty('--bg-color2', theme.bgColor2 || '#f0f0f0');
+            root.style.setProperty('--text-color', theme.textColor || '#000000');
+            root.style.setProperty('--link-color', theme.linkColor || '#0000ff');
+            
+            
+            const containerBg = hexToRgba(theme.containerBgColor, theme.containerBgOpacity);
+            root.style.setProperty('--container-bg-color', containerBg);
+            
+            
+            if (theme.font) {
+                const fontName = theme.font.replace(/ /g, '+');
+                let fontLink = document.getElementById('theme-font-link');
+                if (!fontLink) {
+                    fontLink = document.createElement('link');
+                    fontLink.id = 'theme-font-link';
+                    fontLink.rel = 'stylesheet';
+                    document.head.appendChild(fontLink);
+                }
+                fontLink.href = `https://fonts.googleapis.com/css2?family=${fontName}:wght@400;500;700&display=swap`;
+                root.style.setProperty('--font-family', `'${theme.font}', 'Roboto', sans-serif`);
+            }
+            
+            
+            if (bgImageElement && theme.bgImage) {
+                bgImageElement.style.backgroundImage = `url("${theme.bgImage}")`;
+            }
+            root.style.setProperty('--bg-blur', `${theme.bgBlur || 0}px`);
+            root.style.setProperty('--bg-brightness', `${theme.bgBrightness || 100}%`);
+            
+            
+            root.style.setProperty('--border-radius', `${theme.borderRadius || 8}px`);
+            
+            
+            if (theme.enableGlassmorphism) {
+                const blurValue = `${theme.glassmorphismBlur || 10}px`;
+                document.querySelectorAll('.header, .offers-table-wrapper').forEach(el => {
+                    el.style.backdropFilter = `blur(${blurValue})`;
+                });
+            } else {
+                 document.querySelectorAll('.header, .offers-table-wrapper').forEach(el => {
+                    el.style.backdropFilter = 'none';
+                });
+            }
+            
+            
+            const oldScrollbarStyle = document.getElementById('custom-scrollbar-style');
+            if (oldScrollbarStyle) {
+                oldScrollbarStyle.remove();
+            }
+            if (theme.enableCustomScrollbar) {
+                const scrollbarStyle = `
+                    ::-webkit-scrollbar { width: ${theme.scrollbarWidth || 10}px; }
+                    ::-webkit-scrollbar-track { background: ${theme.scrollbarTrackColor || '#f1f1f1'}; }
+                    ::-webkit-scrollbar-thumb { 
+                        background: ${theme.scrollbarThumbColor || '#888'}; 
+                        border-radius: ${theme.borderRadius || 8}px;
+                    }
+                    ::-webkit-scrollbar-thumb:hover { background: #555; }
+                `;
+                const styleEl = document.createElement('style');
+                styleEl.id = 'custom-scrollbar-style';
+                styleEl.textContent = scrollbarStyle;
+                document.head.appendChild(styleEl);
+            }
+        }
+
+        
+
+        
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!file.name.endsWith('.fptheme')) {
+                alert('Неверный тип файла. Пожалуйста, выберите файл с расширением .fptheme');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const themeData = JSON.parse(e.target.result);
+                    applyTheme(themeData);
+                } catch (error) {
+                    alert('Ошибка при чтении файла темы. Убедитесь, что это корректный JSON файл.');
+                    console.error("Ошибка парсинга темы:", error);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        
+        function triggerFileUpload() {
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = '.fptheme,application/json';
+            fileInput.style.display = 'none';
+            fileInput.addEventListener('change', handleFileSelect);
+            document.body.appendChild(fileInput);
+            fileInput.click();
+            document.body.removeChild(fileInput); 
+        }
+
+        
+
+        
+        const logoElement = document.querySelector('.logo');
+        if (logoElement) {
+            logoElement.style.cursor = 'pointer';
+            logoElement.title = 'Загрузить тему (.fptheme)';
+            logoElement.addEventListener('click', (event) => {
+                event.preventDefault();
+                triggerFileUpload();
+            });
+        }
+    });
+</script>
+
+</body>
+</html>
