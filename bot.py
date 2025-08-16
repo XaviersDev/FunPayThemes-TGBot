@@ -1,4 +1,3 @@
-
 import asyncio
 import logging
 import os
@@ -6,11 +5,10 @@ import sqlite3
 import json
 import hashlib
 import secrets
-import textwrap
 import io
 
 import requests
-from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageFilter
 
 from aiogram import Bot, Dispatcher, F, types
 from aiogram.filters import CommandStart, Command
@@ -30,7 +28,6 @@ from aiogram.utils.deep_linking import create_start_link
 import config
 
 logging.basicConfig(level=logging.INFO)
-
 bot = Bot(token=config.API_TOKEN)
 dp = Dispatcher()
 
@@ -45,10 +42,7 @@ class Database:
         self.setup()
 
     def setup(self):
-        self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY, username TEXT, theme_slots INTEGER DEFAULT 10, is_banned INTEGER DEFAULT 0
-            )''')
+        self.cursor.execute('CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, theme_slots INTEGER DEFAULT 10, is_banned INTEGER DEFAULT 0)')
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS themes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, unique_id TEXT NOT NULL UNIQUE, owner_id INTEGER NOT NULL,
@@ -179,16 +173,7 @@ def hex_to_rgb(hex_color):
     hex_color = hex_color.lstrip('#')
     return tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
 
-def get_font(size, style='Regular'):
-    font_map = {'Regular': 'Roboto-Regular.ttf', 'Bold': 'Roboto-Bold.ttf'}
-    font_filename = font_map.get(style, 'Roboto-Regular.ttf')
-    font_path = os.path.join(SCRIPT_DIR, font_filename)
-    try:
-        return ImageFont.truetype(font_path, size)
-    except IOError:
-        return ImageFont.load_default(size)
-
-async def generate_preview(theme_data: dict, temp_file_path: str, owner_name: str):
+async def generate_preview(theme_data: dict, temp_file_path: str):
     try:
         W, H = 1280, 720
         img = Image.new('RGB', (W, H), color=hex_to_rgb(theme_data.get('bgColor1', '#121212')))
@@ -196,84 +181,75 @@ async def generate_preview(theme_data: dict, temp_file_path: str, owner_name: st
         bg_image_url = theme_data.get('bgImage')
         if bg_image_url:
             try:
-                if bg_image_url.startswith('data:image'):
+                if bg_image_url.startswith('data:image/gif;base64,'):
+                    import base64
+                    img_data = base64.b64decode(bg_image_url.split(',')[1])
+                    bg_img_data = io.BytesIO(img_data)
+                elif bg_image_url.startswith('data:image'):
+                    
                     pass
                 else:
                     response = requests.get(bg_image_url, timeout=10)
                     response.raise_for_status()
                     bg_img_data = io.BytesIO(response.content)
-                    bg = Image.open(bg_img_data).convert("RGBA")
-                    
-                    bg_w, bg_h = bg.size
-                    scale = max(W / bg_w, H / bg_h)
-                    new_w, new_h = int(bg_w * scale), int(bg_h * scale)
-                    bg = bg.resize((new_w, new_h), Image.Resampling.LANCZOS)
-                    
-                    left = (new_w - W) / 2
-                    top = (new_h - H) / 2
-                    right = (new_w + W) / 2
-                    bottom = (new_h + H) / 2
-                    bg = bg.crop((left, top, right, bottom))
-                    
-                    blur_radius = int(theme_data.get('bgBlur', 0))
-                    if blur_radius > 0:
-                        bg = bg.filter(ImageFilter.GaussianBlur(radius=blur_radius))
-                    
-                    brightness = float(theme_data.get('bgBrightness', 100)) / 100
-                    enhancer = ImageEnhance.Brightness(bg)
-                    bg = enhancer.enhance(brightness)
-                    
-                    img.paste(bg, (0, 0))
+                
+                bg = Image.open(bg_img_data).convert("RGBA")
+                bg_w, bg_h = bg.size
+                scale = max(W / bg_w, H / bg_h)
+                new_w, new_h = int(bg_w * scale), int(bg_h * scale)
+                bg = bg.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                
+                left, top = (new_w - W) / 2, (new_h - H) / 2
+                bg = bg.crop((left, top, left + W, top + H))
+                
+                blur_radius = int(theme_data.get('bgBlur', 0))
+                if blur_radius > 0:
+                    bg = bg.filter(ImageFilter.GaussianBlur(radius=blur_radius))
+                
+                brightness = float(theme_data.get('bgBrightness', 100)) / 100
+                enhancer = ImageEnhance.Brightness(bg)
+                bg = enhancer.enhance(brightness)
+                
+                img.paste(bg, (0, 0), bg if bg.mode == 'RGBA' else None)
             except Exception as e:
                 logging.warning(f"Could not load background image: {e}")
 
         draw = ImageDraw.Draw(img, 'RGBA')
 
-        card_w, card_h = 800, 450
-        card_x, card_y = (W - card_w) // 2, (H - card_h) // 2
+        bar_h = 80
+        bar_y = H - bar_h - 40
+        bar_x = 40
+        bar_w = W - 80
+        
         container_color = list(hex_to_rgb(theme_data.get('containerBgColor', '#1e1e1e')))
         container_color.append(int(float(theme_data.get('containerBgOpacity', 0.85)) * 255))
         
-        
-        border_radius = int(theme_data.get('borderRadius', 12))
-        
         draw.rounded_rectangle(
-            (card_x, card_y, card_x + card_w, card_y + card_h),
-            radius=border_radius,
+            (bar_x, bar_y, bar_x + bar_w, bar_y + bar_h),
+            radius=int(theme_data.get('borderRadius', 12)),
             fill=tuple(container_color)
         )
-
-        font_bold = get_font(48, 'Bold')
-        font_regular = get_font(24)
-        font_small = get_font(18)
         
-        text_color = hex_to_rgb(theme_data.get('textColor', '#ffffff'))
-        
-        title = theme_data.get('name', 'Название темы')
-        draw.text((card_x + 40, card_y + 40), title, font=font_bold, fill=text_color)
-        
-        desc = theme_data.get('description', 'Описание темы отсутствует.')
-        wrapped_desc = textwrap.fill(desc, width=60)
-        draw.text((card_x + 40, card_y + 110), wrapped_desc, font=font_regular, fill=text_color, spacing=8)
-        
-        author_text = f"Автор: @{owner_name}"
-        draw.text((card_x + 40, card_y + card_h - 100), author_text, font=font_small, fill=tuple(list(text_color) + [180]))
-        
-        colors_y = card_y + card_h - 60
         colors = {
             "Основной": theme_data.get('bgColor1', '#000000'),
             "Акцент": theme_data.get('bgColor2', '#000000'),
+            "Фон блоков": theme_data.get('containerBgColor', '#1e1e1e'),
             "Текст": theme_data.get('textColor', '#ffffff'),
             "Ссылки": theme_data.get('linkColor', '#0099ff'),
         }
         
-        current_x = card_x + 40
-        for name, color_hex in colors.items():
-            draw.rectangle((current_x, colors_y, current_x + 25, colors_y + 25), fill=color_hex, outline="#fff", width=1)
-            draw.text((current_x + 35, colors_y + 2), name, font=font_small, fill=text_color)
-            current_x += 150
+        color_w = (bar_w - 40) / len(colors)
+        current_x = bar_x + 20
+        for color_hex in colors.values():
+            draw.rectangle(
+                (current_x, bar_y + 20, current_x + color_w - 20, bar_y + bar_h - 20),
+                fill=color_hex,
+                outline="#fff",
+                width=1
+            )
+            current_x += color_w
             
-        img.save(temp_file_path, "JPEG", quality=85)
+        img.save(temp_file_path, "JPEG", quality=90)
         return temp_file_path
     except Exception as e:
         logging.error(f"Fatal error in Pillow preview generation: {e}", exc_info=True)
@@ -311,9 +287,7 @@ async def command_start_handler(message: Message, state: FSMContext):
             owner_username = f"@{owner[1]}" if owner[1] else f"User ID: {owner_id}"
             caption = f"🎨 **{name}**\n\n📝 *{desc}*\n\n👤 **Автор:** {owner_username}"
             
-            await bot.send_photo(
-                chat_id=message.chat.id, photo=preview_file_id, caption=caption, parse_mode="Markdown"
-            )
+            await bot.send_photo(chat_id=message.chat.id, photo=preview_file_id, caption=caption, parse_mode="Markdown")
             await bot.send_document(chat_id=message.chat.id, document=file_id)
             return
 
@@ -396,8 +370,7 @@ async def process_theme_file(message: Message, state: FSMContext):
         await message.reply("Не удалось прочитать файл темы. Убедитесь, что это корректный JSON файл.")
         return
     finally:
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
+        if os.path.exists(temp_path): os.remove(temp_path)
 
     await state.update_data(file_id=document.file_id, file_hash=file_hash, theme_data=theme_data)
     await state.set_state(UploadTheme.waiting_for_name)
@@ -415,10 +388,8 @@ async def process_theme_description(message: Message, state: FSMContext):
     await state.set_state(UploadTheme.waiting_for_privacy)
     await message.answer("Описание добавлено. Сделать тему публичной или приватной?",
                          reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                             [
-                                 InlineKeyboardButton(text="🌍 Публичная", callback_data="set_privacy_public"),
-                                 InlineKeyboardButton(text="🔒 Приватная", callback_data="set_privacy_private")
-                             ],
+                             [InlineKeyboardButton(text="🌍 Публичная", callback_data="set_privacy_public"),
+                              InlineKeyboardButton(text="🔒 Приватная", callback_data="set_privacy_private")],
                              [InlineKeyboardButton(text="❌ Отмена", callback_data="start")]
                          ]))
 
@@ -431,16 +402,13 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
     
     user_data = await state.get_data()
     theme_data_from_file = user_data['theme_data']
-    theme_data_from_file['name'] = user_data['name']
-    theme_data_from_file['description'] = user_data['description']
 
     preview_path = os.path.join(THEMES_DIR, f"preview_{callback.from_user.id}_{secrets.token_hex(8)}.jpg")
     
-    owner_name = callback.from_user.username or callback.from_user.id
-    generated_path = await generate_preview(theme_data_from_file, preview_path, str(owner_name))
+    generated_path = await generate_preview(theme_data_from_file, preview_path)
     
     if not generated_path:
-        await callback.message.edit_text("❌ Произошла ошибка при создании превью. Попробуйте загрузить тему еще раз.", reply_markup=main_menu_keyboard())
+        await callback.message.edit_text("❌ Произошла ошибка при создании превью.", reply_markup=main_menu_keyboard())
         await state.clear()
         return
 
@@ -467,10 +435,9 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
 
     except Exception as e:
         logging.error(f"Error in final upload stage: {e}")
-        await callback.message.edit_text("❌ Произошла серьезная ошибка при сохранении темы. Пожалуйста, сообщите администратору.", reply_markup=main_menu_keyboard())
+        await callback.message.edit_text("❌ Произошла серьезная ошибка при сохранении темы.", reply_markup=main_menu_keyboard())
     finally:
-        if os.path.exists(generated_path):
-            os.remove(generated_path)
+        if os.path.exists(generated_path): os.remove(generated_path)
         await state.clear()
 
 @dp.callback_query(F.data == "my_themes")
@@ -486,7 +453,12 @@ async def my_themes_handler(callback: CallbackQuery):
         keyboard.append([InlineKeyboardButton(text=f"{status} {name}", callback_data=f"manage_theme_{theme_id}")])
     keyboard.append([InlineKeyboardButton(text="🔙 Назад", callback_data="start")])
     
-    await callback.message.edit_text("Ваши темы:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+    
+    if callback.message.photo:
+        await callback.message.delete()
+        await callback.message.answer("Ваши темы:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
+    else:
+        await callback.message.edit_text("Ваши темы:", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
 @dp.callback_query(F.data.startswith("manage_theme_"))
 async def manage_theme_handler(callback: CallbackQuery):
@@ -583,13 +555,10 @@ async def store_handler(callback: CallbackQuery):
     if nav_buttons: keyboard.append(nav_buttons)
     keyboard.append([InlineKeyboardButton(text="🔙 В главное меню", callback_data="start")])
     
-    if callback.message.text and "Страница" in callback.message.text:
-         await callback.message.edit_text(f"Страница {page + 1}", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
-    else:
+    if callback.message.photo:
         await callback.message.answer(f"Страница {page + 1}", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
-        try:
-            await callback.message.delete()
-        except TelegramBadRequest: pass
+    else:
+        await callback.message.edit_text(f"Страница {page + 1}", reply_markup=InlineKeyboardMarkup(inline_keyboard=keyboard))
 
 @dp.callback_query(F.data.startswith("download_"))
 async def download_theme_handler(callback: CallbackQuery):
@@ -704,7 +673,6 @@ async def main():
         if not os.path.exists(font_path):
             try:
                 logging.info(f"Downloading font: {font_filename}")
-                
                 url = f"https://github.com/google/fonts/raw/main/apache/roboto/{font_filename}"
                 response = requests.get(url)
                 response.raise_for_status()
