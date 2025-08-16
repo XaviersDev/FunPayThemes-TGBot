@@ -1,7 +1,7 @@
 
 import asyncio
 import logging
-import os
+import os  
 import sqlite3
 import json
 import hashlib
@@ -35,9 +35,15 @@ bot = Bot(token=config.API_TOKEN)
 dp = Dispatcher()
 
 
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+
 class Database:
     def __init__(self, db_file):
-        self.connection = sqlite3.connect(db_file)
+        
+        db_path = os.path.join(SCRIPT_DIR, db_file)
+        self.connection = sqlite3.connect(db_path)
         self.cursor = self.connection.cursor()
         self.setup()
 
@@ -191,7 +197,9 @@ dp.callback_query.middleware(AccessMiddleware())
 
 async def generate_preview(theme_data: dict, temp_file_path: str):
     try:
-        with open('preview_template.html', 'r', encoding='utf-8') as f:
+        
+        template_path = os.path.join(SCRIPT_DIR, 'preview_template.html')
+        with open(template_path, 'r', encoding='utf-8') as f:
             template = f.read()
 
         
@@ -206,9 +214,7 @@ async def generate_preview(theme_data: dict, temp_file_path: str):
         template = template.replace('/*BG_BRIGHTNESS*/', str(theme_data.get('bgBrightness', 100)))
         
         bg_image_url = theme_data.get('bgImage', '')
-        
         if bg_image_url and bg_image_url.startswith('data:image'):
-            
             bg_image_url = 'https://i.ibb.co/ZpS0d56/PH6-UEvp-Kn-KI.jpg' 
         template = template.replace('/*BG_IMAGE*/', bg_image_url)
 
@@ -222,6 +228,8 @@ async def generate_preview(theme_data: dict, temp_file_path: str):
     except Exception as e:
         logging.error(f"Error generating preview: {e}")
         return None
+
+
 
 
 def main_menu_keyboard():
@@ -267,13 +275,13 @@ async def command_start_handler(message: Message, state: FSMContext):
             await bot.send_document(chat_id=message.chat.id, document=file_id)
             return
 
-    await message.answer("👋 Добро пожаловать в FP Themes Bot!\n\nЗдесь вы можете загружать, скачивать и делиться темами для расширения FunPay Tools.",
+    await message.answer("👋 Добро пожаловать в FunPay Themes Bot!\n\nЗдесь вы можете загружать, скачивать и делиться темами для расширения FunPay Tools.",
                          reply_markup=main_menu_keyboard())
 
 @dp.callback_query(F.data == "start")
 async def back_to_start(callback: CallbackQuery, state: FSMContext):
     await state.clear()
-    await callback.message.edit_text("👋 Добро пожаловать в FP Themes Bot!\n\nЗдесь вы можете загружать, скачивать и делиться темами для расширения FunPay Tools.",
+    await callback.message.edit_text("👋 Добро пожаловать в FunPay Themes Bot!\n\nЗдесь вы можете загружать, скачивать и делиться темами для расширения FunPay Tools.",
                                      reply_markup=main_menu_keyboard())
 
 @dp.callback_query(F.data == "check_subscription")
@@ -303,9 +311,9 @@ async def upload_theme_start(callback: CallbackQuery, state: FSMContext):
 
     await state.set_state(UploadTheme.waiting_for_file)
     await callback.message.edit_text(
-        f"Отлично! Отправьте мне файл темы в формате `.fptheme`.\n\n"
+        f"Отлично! Отправьте мне файл темы в формате `.FunPaytheme`.\n\n"
         f"⚠️ **Требования:**\n"
-        f"- Только формат `.fptheme`\n"
+        f"- Только формат `.FunPaytheme`\n"
         f"- Размер до {config.MAX_FILE_SIZE_MB} МБ\n"
         f"- Тема не должна быть дубликатом уже загруженной\n\n"
         f"У вас осталось слотов: {user_slots - current_themes}",
@@ -315,30 +323,24 @@ async def upload_theme_start(callback: CallbackQuery, state: FSMContext):
 @dp.message(UploadTheme.waiting_for_file, F.document)
 async def process_theme_file(message: Message, state: FSMContext):
     document = message.document
-    if not document.file_name.endswith('.fptheme'):
-        await message.reply("Неверный формат файла. Пожалуйста, отправьте файл с расширением `.fptheme`.")
+    if not document.file_name.endswith('.FunPaytheme'):
+        await message.reply("Неверный формат файла. Пожалуйста, отправьте файл с расширением `.FunPaytheme`.")
         return
 
     if document.file_size > config.MAX_FILE_SIZE_MB * 1024 * 1024:
         await message.reply(f"Файл слишком большой. Максимальный размер - {config.MAX_FILE_SIZE_MB} МБ.")
         return
     
-    
-    if not os.path.exists(config.THEMES_DIR):
-        os.makedirs(config.THEMES_DIR)
-        
-    temp_path = os.path.join(config.THEMES_DIR, f"temp_{message.from_user.id}_{document.file_unique_id}.fptheme")
+    temp_path = os.path.join(config.THEMES_DIR, f"temp_{message.from_user.id}_{document.file_unique_id}.FunPaytheme")
     await bot.download(document, destination=temp_path)
 
     try:
-        
         with open(temp_path, 'rb') as f:
             file_hash = hashlib.sha256(f.read()).hexdigest()
         if db.has_duplicate_hash(file_hash):
             await message.reply("Такая тема уже была загружена в бота.")
             return
 
-        
         with open(temp_path, 'r', encoding='utf-8') as f:
             theme_data = json.load(f)
         if not all(k in theme_data for k in ['bgColor1', 'font', 'bgImage']):
@@ -349,7 +351,7 @@ async def process_theme_file(message: Message, state: FSMContext):
         return
     finally:
         if os.path.exists(temp_path):
-            os.remove(temp_path) 
+            os.remove(temp_path)
 
     await state.update_data(file_id=document.file_id, file_hash=file_hash, theme_data=theme_data)
     await state.set_state(UploadTheme.waiting_for_name)
@@ -394,11 +396,9 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
         return
 
     try:
-        
         preview_msg = await bot.send_photo(chat_id=callback.from_user.id, photo=FSInputFile(generated_path))
         preview_file_id = preview_msg.photo[-1].file_id
 
-        
         db.add_theme(
             owner_id=callback.from_user.id,
             name=user_data['name'],
@@ -412,9 +412,11 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
         final_caption = f"✅ Тема **{user_data['name']}** успешно загружена!\n\nВы можете управлять ей во вкладке 'Мои темы'."
 
         if not is_public:
-            theme_raw = db.get_theme_by_unique_id(user_data['file_hash']) 
-            if theme_raw:
-                 link = await create_start_link(bot, theme_raw[1], encode=True)
+            
+            last_theme = db.get_user_themes(callback.from_user.id)[0]
+            theme_info = db.get_theme_by_id(last_theme[0])
+            if theme_info:
+                 link = await create_start_link(bot, theme_info[1], encode=True)
                  final_caption += f"\n\n🔗 Ваша приватная ссылка: {link}"
         
         await callback.message.edit_text(final_caption, parse_mode="Markdown")
@@ -427,10 +429,6 @@ async def process_theme_privacy(callback: CallbackQuery, state: FSMContext):
             os.remove(generated_path)
         await state.clear()
         await callback.message.answer("Возвращаю в главное меню...", reply_markup=main_menu_keyboard())
-
-
-
-
 
 @dp.callback_query(F.data == "my_themes")
 async def my_themes_handler(callback: CallbackQuery):
@@ -510,7 +508,6 @@ async def confirm_delete_handler(callback: CallbackQuery):
     else:
         await callback.answer("Ошибка при удалении.", show_alert=True)
         
-
 @dp.callback_query(F.data.startswith("store_"))
 async def store_handler(callback: CallbackQuery):
     page = int(callback.data.split("_")[1])
@@ -537,7 +534,6 @@ async def store_handler(callback: CallbackQuery):
             ])
         )
     
-    
     has_next = (page + 1) * limit < total_themes
     has_prev = page > 0
     nav_buttons = []
@@ -555,7 +551,7 @@ async def store_handler(callback: CallbackQuery):
     try:
         await callback.message.delete()
     except TelegramBadRequest:
-        pass 
+        pass
 
 @dp.callback_query(F.data.startswith("download_"))
 async def download_theme_handler(callback: CallbackQuery):
@@ -565,7 +561,6 @@ async def download_theme_handler(callback: CallbackQuery):
         await bot.send_document(chat_id=callback.from_user.id, document=theme[6]) 
     else:
         await callback.answer("Тема не найдена.", show_alert=True)
-
 
 @dp.callback_query(F.data == "buy_slots")
 async def buy_slots_handler(callback: CallbackQuery):
@@ -599,12 +594,10 @@ async def successful_payment_handler(message: Message):
         )
 
 
-
-
-
 async def main():
-    if not os.path.exists(config.THEMES_DIR):
-        os.makedirs(config.THEMES_DIR)
+    themes_path = os.path.join(SCRIPT_DIR, config.THEMES_DIR)
+    if not os.path.exists(themes_path):
+        os.makedirs(themes_path)
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
